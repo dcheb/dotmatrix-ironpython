@@ -1,0 +1,282 @@
+#!/usr/bin/ipy
+
+import clr
+
+clr.AddReference("System.Windows.Forms")
+clr.AddReference("System.Drawing")
+
+
+
+
+from System.Windows.Forms import Application, Form, CheckBox, ControlStyles
+from System.Windows.Forms import Button, ToolTip, TextBox, Label
+from System.Windows.Forms import OpenFileDialog, DialogResult
+
+from System.Drawing import Point, Size, Brushes, Color, SolidBrush, Rectangle
+
+
+def initparams(obj, kwlist, kw):
+	for name in kwlist:
+		if name in kw:
+			setattr(obj, name, kw[name])
+
+
+## ======= 
+def similarity(c1,c2):
+	if c1==c2:
+		return 1
+	else:
+		return 0
+		
+#nuId = {'a':2, 
+#		't':3,
+#		'c':4,
+#		'g':5
+#		}
+	
+def similarity2(c1,c2):
+	if c1==c2:
+		return c1
+	else:
+		return 0
+		
+def getcolor(s):
+	return Color.FromArgb( 255-  int(255*s), 255, 255 )
+	
+	
+## =========
+
+
+
+class SequenceBox(TextBox):
+	def __init__(self):
+		self.LengthLabel = Label()
+		self.initOpenFileBtn()
+		
+	def initOpenFileBtn(self):
+		self.OpenFileBtn = Button()
+		self.OpenFileBtn.Text= "Load file..."
+		self.OpenFileBtn.Parent = self.Parent
+		self.OpenFileBtn.Click += self.openFile
+		
+	def openFile(self, sender, event):
+		dialog = OpenFileDialog()
+		#dialog.Filter = "Text files|*.txt|Fasta files|*.fasta"
+		if dialog.ShowDialog(self) == DialogResult.OK:
+			f = open(dialog.FileName)
+			data = f.read()
+			f.close()
+			self.Text = data	
+		
+
+class DMGraph:
+	NX=0
+	NY=0
+	def __init__(self, **kwargs):
+		#initparams(self, ["AreaBounds"], kwargs)
+		self.AreaBounds = Rectangle(300,30,500,500)
+		self.N = 0
+		
+		
+		
+		
+#===================
+#     DotMatrix main form
+#===================
+class DMForm(Form):
+    
+    def __init__(self):
+        self.Text = 'Dot-matrix method for sequence alignment'        
+        self.Size   = Size(1000, 640)
+        self.Graph = DMGraph()
+                
+        self._AddLbl( Location = (20,20), Size = (200, 36),
+        			Text="A demo of dot-matrix method for pairwise sequence alignment" )
+        self.Click  += self.SelfOnClick
+           
+           
+        btnQuit = self._AddBtn(Text = "Quit", Location=(900,20))
+        btnCompute = self._AddBtn(Text = "Compute", Location=(900,50))
+        
+
+        self.tb1 = self._AddSequenceBox(Location=(20,70), OnTextChanged = "UpdateLengthLabel", Label ="Y")
+        self.tb2 = self._AddSequenceBox(Location=(20,260), OnTextChanged = "UpdateLengthLabel", Label ="Y")  
+        
+        self.Paint += self.OnPaint
+        self.CenterToScreen()
+        
+    def OnPaint(self, event):
+    	g = event.Graphics
+    	g.FillRectangle(SolidBrush(Color.Gray), self.Graph.AreaBounds)
+    	self.DrawDotMatrix(g)	
+    	g.Dispose()
+    	
+    
+    
+    #---------------------------
+    #		ADD BUTTON
+    #----------------------------
+    def _AddBtn(self, **kwargs):    
+        button  = Button()
+        button.Parent = self
+        button.Text = kwargs["Text"]
+        button.Location = Point(*kwargs["Location"])
+        # button.id = kwargs.get("Id")
+        # tooltip = ToolTip()
+        # tooltip.SetToolTip(button, button.Text + "button")
+        
+        button.Click      += self.BtnOnClick
+        button.MouseEnter += self.OnEnter
+        return button
+    
+    def _AddTextBox(self, **kwargs):
+    	tbox = TextBox()
+    	tbox.Parent = self
+    	tbox.Size = Size(200,80)
+    	tbox.Multiline = True
+    	tbox.Location = Point(*kwargs["Location"])
+    	if "OnTextChanged" in kwargs:
+    		tbox.TextChanged += getattr(self, kwargs["OnTextChanged"] )
+    	return tbox
+    	
+    def _AddLbl( self,  **kwargs):
+    	lbl  = Label()
+    	lbl.Parent = self
+    	if "Text" in kwargs:
+    		lbl.Text = kwargs["Text"]
+    	if "Size" in kwargs:
+    		lbl.Size = Size(*kwargs["Size"])
+    	lbl.Location = Point(*kwargs["Location"])
+    	return lbl
+	
+    #---------------------------
+    #		ADD SEQUENCE BOX
+    #----------------------------
+    #  A sequence box is a text box that also has a label showing length of the sequence
+    #	
+    #----------------------------
+    def _AddSequenceBox(self, **kwargs):
+    	sb = SequenceBox()
+    	sb.Parent = self
+    	sb.Multiline = True
+    	sb.Location = Point(*kwargs["Location"])
+    	sb.Size = Size(200,80)
+    	if "OnTextChanged" in kwargs:
+    		sb.TextChanged += getattr(self, kwargs["OnTextChanged"] )
+    	else:
+    		sb.TextChanged += self.UpdateLengthLabel
+    	labelX = sb.Location.X
+    	labelY = sb.Location.Y + sb.Size.Height + 10
+    	sb.LengthLabel.Parent = self
+    	sb.LengthLabel.Location = Point( labelX, labelY)
+    	sb.LengthLabel.Text = "Length:"
+    	
+    	lbtnX = labelX +sb.Size.Width - 60
+    	lbtnY = labelY    	
+    	#loadBtn = self._AddBtn(Text='Open file...', Location=(lbtnX, lbtnY) )
+    	sb.OpenFileBtn.Location = Point(lbtnX, lbtnY)
+    	sb.OpenFileBtn.Parent  = self
+
+    	#loadBtn.Location = Point(lbtnX, lbtnY)
+    	return sb
+	
+	    	
+    def _AddCheckBox(self, **kwargs):
+    	cb = CheckBox()
+        cb.Parent = self
+        cb.Location = Point(*kwargs["Location"])
+        cb.Text = "show title"
+        cb.Checked = True
+        cb.CheckedChanged  += self.OnChanged  
+ 
+    def loadSeq(self, tb):
+    	dialog = OpenFileDialog()
+    	dialog.Filter = "C# files (*.cs)|*.cs"
+    	if dialog.ShowDialog(self) == DialogResult.OK:
+    		f = open(dialog.FileName)
+    		data = f.read()
+    		f.Close()
+    		self.textbox.Text = data
+    
+    def OnTextChg(self, sender, event):
+    	pass
+    
+    def BtnOnClick(self, sender, args):
+    	#print "Button clicked: <%s>" %sender.Text
+    	fork = { "Quit": self.Close,
+    			"": self.Close,
+    			"Compute" : self.Invalidate
+    			}
+    	fork[sender.Text]()
+    		
+    def OnEnter(self, sender, args):
+    	print "Button entered"
+    	
+    def UpdateLengthLabel(self, sender, event):
+    	sender.LengthLabel.Text = "Length: " + str(len(sender.Text) )
+
+   	
+        
+    #def OnChanged(self, sender, event):
+
+    		
+    def SelfOnClick(self, sender, args):
+    	pass
+   	
+    def getComparisonTable(self, simfun):
+    	NX = self.Graph.NX = len(self.tb1.Text)
+    	NY = self.Graph.NY = len(self.tb2.Text)
+    	table = []
+    	for i in range(NX):
+    		table.append([])
+    		for j in range(NY):
+    			simvalue = apply( simfun, (self.tb1.Text[i], self.tb2.Text[j]) )
+    			table[i].append( simvalue)
+    	return table
+    	
+    def DrawDotMatrix(self, gr):
+    	if min(  len(self.tb1.Text), len(self.tb2.Text) ) == 0:
+    		return
+    		
+    	self.Graph.NX = len(self.tb1.Text)
+    	self.Graph.NY = len(self.tb2.Text)
+    	
+    	bdry = self.Graph.AreaBounds
+  	
+    	hpx = (0.0 + bdry.Width )/  self.Graph.NX
+    	vpx = (0.0 + bdry.Height) / self.Graph.NY
+    	
+    	sqSize = min(hpx, vpx)
+    	
+    	t = self.getComparisonTable(similarity2)
+    	
+    	#Render
+    	brushes = { 0: SolidBrush(Color.FromArgb(250,250,255)), 
+    				1: SolidBrush(Color.FromArgb(20,20,30)),
+    				'default': SolidBrush(Color.FromArgb(50,50,50)),
+    				'a': SolidBrush(Color.FromArgb(200,20,30)),
+    				't': SolidBrush(Color.FromArgb(200,20,200)),
+    				'c': SolidBrush(Color.FromArgb(20,200,30)),
+    				'g': SolidBrush(Color.FromArgb(20,200,200)),
+    				}	
+    	if sqSize>10:
+    		tileSize = int(sqSize -1)
+    	else:
+    		tileSize = int(sqSize)
+    		
+    	matrixX = bdry.X + 2
+    	matrixY = bdry.Y + 2 
+    	
+    	for i in range(self.Graph.NX):
+    		for j in range(self.Graph.NY):
+    			#color = getcolor( t[i][j] )
+    			br = brushes.get(  t[i][j], brushes['default'])
+    			gr.FillRectangle( br, 
+    					Rectangle( matrixX + i*int(sqSize), 
+    								matrixY+ j*int(sqSize) ,
+    								tileSize, tileSize) )
+    	
+    	
+
+Application.Run(DMForm())
+
